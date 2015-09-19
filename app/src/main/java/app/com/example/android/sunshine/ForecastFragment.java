@@ -1,5 +1,6 @@
 package app.com.example.android.sunshine;
 
+import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v4.app.Fragment;
@@ -12,8 +13,10 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -24,7 +27,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -35,7 +37,7 @@ import java.util.Arrays;
  */
 public class ForecastFragment extends Fragment {
 
-    private ArrayAdapter<String> forecastAdapter;
+    private ArrayAdapter<String> mForecastAdapter;
 
     public ForecastFragment() {
     }
@@ -65,12 +67,24 @@ public class ForecastFragment extends Fragment {
 
         ArrayList<String> weekForecast = new ArrayList<>(Arrays.asList(data));
 
-        forecastAdapter = new ArrayAdapter<String>(getActivity(),
+        mForecastAdapter = new ArrayAdapter<String>(getActivity(),
                 R.layout.list_item_forecast, R.id.list_item_forecast_textview,
                 weekForecast);
 
         ListView forecastListView = (ListView) rootView.findViewById(R.id.listview_forecast);
-        forecastListView.setAdapter(forecastAdapter);
+        forecastListView.setAdapter(mForecastAdapter);
+
+        forecastListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                String dayForecastStr = mForecastAdapter.getItem(position);
+
+                Intent detailIntent = new Intent(getActivity(), DetailActivity.class);
+                detailIntent.putExtra(Intent.EXTRA_TEXT, dayForecastStr);
+
+                startActivity(detailIntent);
+            }
+        });
 
         return rootView;
     }
@@ -86,7 +100,7 @@ public class ForecastFragment extends Fragment {
         int id = item.getItemId();
 
         if (id == R.id.action_refresh) {
-            new FetchWeatherTask().execute("94043");
+            new FetchWeatherTask().execute("02801");
 
             return true;
         }
@@ -187,11 +201,11 @@ public class ForecastFragment extends Fragment {
         protected void onPostExecute(String[] strings) {
             ArrayList<String> weekForecastList = new ArrayList<>(Arrays.asList(strings));
 
-            forecastAdapter.clear();
+            mForecastAdapter.clear();
 
-            forecastAdapter.addAll(weekForecastList);
+            mForecastAdapter.addAll(weekForecastList);
 
-            forecastAdapter.notifyDataSetChanged();
+            mForecastAdapter.notifyDataSetChanged();
         }
 
         private String getReadableDateString(long time){
