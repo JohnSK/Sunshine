@@ -1,8 +1,10 @@
 package app.com.example.android.sunshine;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.text.format.Time;
@@ -55,21 +57,9 @@ public class ForecastFragment extends Fragment {
 
         View rootView = inflater.inflate(R.layout.fragment_main, container, false);
 
-        String[] data = {
-                "Mon 6/23 - Sunny - 31/17",
-                "Tue 6/24 - Foggy - 21/8",
-                "Wed 6/25 - Cloudy - 22/17",
-                "Thurs 6/26 - Rainy - 18/11",
-                "Fri 6/27 - Foggy - 21/10",
-                "Sat 6/28 - TRAPPED IN WEATHERSTATION - 23/18",
-                "Sun 6/29 - Sunny - 20/7"
-        };
-
-        ArrayList<String> weekForecast = new ArrayList<>(Arrays.asList(data));
-
         mForecastAdapter = new ArrayAdapter<String>(getActivity(),
                 R.layout.list_item_forecast, R.id.list_item_forecast_textview,
-                weekForecast);
+                new ArrayList<String>());
 
         ListView forecastListView = (ListView) rootView.findViewById(R.id.listview_forecast);
         forecastListView.setAdapter(mForecastAdapter);
@@ -100,7 +90,7 @@ public class ForecastFragment extends Fragment {
         int id = item.getItemId();
 
         if (id == R.id.action_refresh) {
-            new FetchWeatherTask().execute("02801");
+            updateWeather();
 
             return true;
         }
@@ -108,14 +98,92 @@ public class ForecastFragment extends Fragment {
         return super.onOptionsItemSelected(item);
     }
 
+    @Override
+    public void onStart() {
+        super.onStart();
+
+        updateWeather();
+    }
+
+    private void updateWeather() {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(getActivity());
+
+        String location = preferences.getString(getString(R.string.pref_location_key),
+                getString(R.string.pref_location_default));
+
+        new FetchWeatherTask().execute(location);
+    }
+
     private class FetchWeatherTask extends AsyncTask<String, Void, String[]> {
 
         private final String LOG_TAG = FetchWeatherTask.class.getSimpleName();
 
+        private String getReadableDateString(long time) {
+            SimpleDateFormat simpleDate = new SimpleDateFormat("EEE, MMM dd");
+
+            return simpleDate.format(time);
+        }
+
+        private String formatHighLows(double high, double low) {
+            long roundedHigh = Math.round(high);
+            long roundedLow = Math.round(low);
+
+            String highLowStr = roundedHigh + "/" + roundedLow;
+
+            return highLowStr;
+        }
+
+        private String[] getWeatherDataFromJson(String forecastJsonStr, int numDays)
+                throws JSONException {
+            final String OWM_LIST = "list";
+            final String OWM_WEATHER = "weather";
+            final String OWM_TEMPERATURE = "temp";
+            final String OWM_MAX = "max";
+            final String OWM_MIN = "min";
+            final String OWM_DESCRIPTION = "main";
+
+            JSONObject forecastJson = new JSONObject(forecastJsonStr);
+            JSONArray weatherArray = forecastJson.getJSONArray(OWM_LIST);
+
+            Time dayTime = new Time();
+            dayTime.setToNow();
+
+            int julianStartDay = Time.getJulianDay(System.currentTimeMillis(), dayTime.gmtoff);
+
+            dayTime = new Time();
+
+            String[] resultStrs = new String[numDays];
+            for (int i = 0; i < weatherArray.length(); i++) {
+                String day;
+                String description;
+                String highAndLow;
+
+                JSONObject dayForecast = weatherArray.getJSONObject(i);
+
+                long dateTime;
+
+                dateTime = dayTime.setJulianDay(julianStartDay + i);
+                day = getReadableDateString(dateTime);
+
+                JSONObject weatherObject = dayForecast.getJSONArray(OWM_WEATHER).getJSONObject(0);
+                description = weatherObject.getString(OWM_DESCRIPTION);
+
+                JSONObject temperatureObject = dayForecast.optJSONObject(OWM_TEMPERATURE);
+                double high = temperatureObject.getDouble(OWM_MAX);
+                double low = temperatureObject.getDouble(OWM_MIN);
+
+                highAndLow = formatHighLows(high, low);
+
+                resultStrs[i] = day + " - " + description + " - " + highAndLow;
+            }
+
+            return resultStrs;
+        }
+
         @Override
         protected String[] doInBackground(String... params) {
 
-            if(params.length == 0){
+            if (params.length == 0) {
                 return null;
             }
 
@@ -171,9 +239,11 @@ public class ForecastFragment extends Fragment {
                 // LOAD DATA from stream buffer to STRING
                 forecastJsonStr = buffer.toString();
 
-                Log.v(LOG_TAG, "Forecast JSON String: "+ forecastJsonStr);
+                Log.v(LOG_TAG, "Forecast JSON String: " + forecastJsonStr);
             } catch (IOException e) {
                 Log.e(LOG_TAG, "Error", e);
+
+                return null;
             } finally {
                 if (urlConnection != null) {
                     urlConnection.disconnect();
@@ -198,76 +268,17 @@ public class ForecastFragment extends Fragment {
         }
 
         @Override
-        protected void onPostExecute(String[] strings) {
-            ArrayList<String> weekForecastList = new ArrayList<>(Arrays.asList(strings));
+        protected void onPostExecute(String[] result) {
+            if(result != null) {
+                ArrayList<String> weekForecastList = new ArrayList<>(Arrays.asList(result));
 
-            mForecastAdapter.clear();
-
-            mForecastAdapter.addAll(weekForecastList);
-
-            mForecastAdapter.notifyDataSetChanged();
-        }
-
-        private String getReadableDateString(long time){
-            SimpleDateFormat simpleDate = new SimpleDateFormat("EEE, MMM dd");
-
-            return simpleDate.format(time);
-        }
-
-        private String formatHighLows(double high, double low) {
-            long roundedHigh = Math.round(high);
-            long roundedLow = Math.round(low);
-
-            String highLowStr = roundedHigh +"/"+ roundedLow;
-
-            return highLowStr;
-        }
-
-        private String[] getWeatherDataFromJson(String forecastJsonStr, int numDays)
-                throws JSONException {
-            final String OWM_LIST = "list";
-            final String OWM_WEATHER ="weather";
-            final String OWM_TEMPERATURE = "temp";
-            final String OWM_MAX = "max";
-            final String OWM_MIN = "min";
-            final String OWM_DESCRIPTION = "main";
-
-            JSONObject forecastJson = new JSONObject(forecastJsonStr);
-            JSONArray weatherArray = forecastJson.getJSONArray(OWM_LIST);
-
-            Time dayTime = new Time();
-            dayTime.setToNow();
-
-            int julianStartDay = Time.getJulianDay(System.currentTimeMillis(), dayTime.gmtoff);
-
-            dayTime = new Time();
-
-            String[] resultStrs = new String[numDays];
-            for(int i=0;i<weatherArray.length();i++) {
-                String day;
-                String description;
-                String highAndLow;
-
-                JSONObject dayForecast = weatherArray.getJSONObject(i);
-
-                long dateTime;
-
-                dateTime = dayTime.setJulianDay(julianStartDay+i);
-                day = getReadableDateString(dateTime);
-
-                JSONObject weatherObject = dayForecast.getJSONArray(OWM_WEATHER).getJSONObject(0);
-                description = weatherObject.getString(OWM_DESCRIPTION);
-
-                JSONObject temperatureObject = dayForecast.optJSONObject(OWM_TEMPERATURE);
-                double high = temperatureObject.getDouble(OWM_MAX);
-                double low = temperatureObject.getDouble(OWM_MIN);
-
-                highAndLow = formatHighLows(high, low);
-
-                resultStrs[i] = day +" - "+ description +" - "+ highAndLow;
+                mForecastAdapter.clear();
+                mForecastAdapter.addAll(weekForecastList);
+            } else {
+                Toast.makeText(getActivity(), "HTTP Connection Error", Toast.LENGTH_LONG).show();
             }
-
-            return resultStrs;
         }
+
+
     }
 }

@@ -1,0 +1,15 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <EditTextPreference
+        android:capitalize="words"
+        android:defaultValue="@string/pref_location_default"
+        android:inputType="textCapWords"
+        android:key="@string/pref_location_key"
+        android:maxLines="1"
+        android:selectAllOnFocus="true"
+        android:singleLine="true"
+        android:title="@string/pref_location_label" />
+
+</PreferenceScreen>
