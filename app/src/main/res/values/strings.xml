@@ -6,8 +6,11 @@
     <string name="title_activity_detail">Details</string>
     <string name="title_activity_settings">Settings</string>
 
-    <!-- LOCATION PREFERENCE SETTINGS -->
+    <!-- GENERAL PREFERENCE SETTINGS -->
     <string name="pref_location_label">Location</string>
     <string name="pref_location_key" translatable="false">location</string>
     <string name="pref_location_default" translatable="false">02801</string>
+    <string name="pref_temperature_label">Temperature</string>
+    <string name="pref_temperature_key" translatable="false">temperature</string>
+    <string name="pref_temperature_default" translatable="false">metric</string>
 </resources>
